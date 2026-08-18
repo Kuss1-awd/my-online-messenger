@@ -1,0 +1,54 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мой Мессенджер</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        #chat { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #messages { list-style: none; padding: 0; height: 300px; overflow-y: auto; border: 1px solid #ccc; margin-bottom: 15px; padding: 10px; background: #fafafa; border-radius: 4px; }
+        #messages li { padding: 6px 10px; margin-bottom: 6px; background: #e3f2fd; border-radius: 4px; color: #000; }
+        #form-box { display: flex; gap: 10px; }
+        #name { width: 30%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #msg { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #send-btn { padding: 8px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div id="chat">
+    <h3>Мессенджер</h3>
+    <ul id="messages"></ul>
+    <div id="form-box">
+        <input id="name" placeholder="Имя" autocomplete="off">
+        <input id="msg" placeholder="Сообщение..." autocomplete="off">
+        <button id="send-btn">Отправить</button>
+    </div>
+</div>
+
+<!-- Берем скрипт напрямую с работающего Node.js сервера -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    var socket = io();
+    
+    var btn = document.getElementById('send-btn');
+    var messages = document.getElementById('messages');
+
+    btn.addEventListener('click', function() {
+        var nameInput = document.getElementById('name').value;
+        var msgInput = document.getElementById('msg').value;
+        
+        if (nameInput.trim() !== '' && msgInput.trim() !== '') {
+            socket.emit('chat message', { user: nameInput, text: msgInput });
+            document.getElementById('msg').value = '';
+        }
+    });
+
+    socket.on('chat message', function(data) {
+        var li = document.createElement('li');
+        li.innerHTML = '<b>' + data.user + ':</b> ' + data.text;
+        messages.appendChild(li);
+        messages.scrollTop = messages.scrollHeight;
+    });
+</script>
+</body>
+</html>
