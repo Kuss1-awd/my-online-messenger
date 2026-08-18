@@ -2,53 +2,140 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Мой Мессенджер</title>
+    <title>Telegram Dark Messenger</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        #chat { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #messages { list-style: none; padding: 0; height: 300px; overflow-y: auto; border: 1px solid #ccc; margin-bottom: 15px; padding: 10px; background: #fafafa; border-radius: 4px; }
-        #messages li { padding: 6px 10px; margin-bottom: 6px; background: #e3f2fd; border-radius: 4px; color: #000; }
-        #form-box { display: flex; gap: 10px; }
-        #name { width: 30%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        #msg { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        #send-btn { padding: 8px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        :root {
+            --bg-color: #182533; --chat-bg: #0e1621; --tg-blue: #2481cc;
+            --text-main: #f5f5f5; --my-msg: #2b5278; --other-msg: #182533; --border-color: #101924;
+        }
+        body { font-family: sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .box { background: var(--chat-bg); padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; box-sizing: border-box; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        h3 { text-align: center; margin-top: 0; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--tg-blue); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .toggle-link { text-align: center; margin-top: 15px; color: var(--tg-blue); cursor: pointer; font-size: 14px; }
+        
+        #chat-window { display: none; width: 100%; max-width: 480px; height: 80vh; flex-direction: column; }
+        #user-info { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-color); }
+        #logout-btn { background: #d93838; width: auto; padding: 6px 12px; }
+        #messages { list-style: none; padding: 20px; margin: 0; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #0e1621; }
+        #messages li { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 15px; word-break: break-word; }
+        #messages li.other { background: var(--other-msg); align-self: flex-start; border-bottom-left-radius: 4px; }
+        #messages li.me { background: var(--my-msg); align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg-author { display: block; font-size: 12px; font-weight: bold; color: #5288c1; margin-bottom: 3px; }
+        #form-box { display: flex; gap: 10px; padding: 15px; background: var(--bg-color); }
+        #msg { flex-grow: 1; margin-bottom: 0; border-radius: 20px; }
+        #send-btn { width: auto; border-radius: 20px; }
     </style>
 </head>
 <body>
-<div id="chat">
-    <h3>Мессенджер</h3>
+
+<!-- АВТОРИЗАЦИЯ -->
+<div id="auth-window" class="box">
+    <h3 id="auth-title">Вход в мессенджер</h3>
+    <input id="auth-username" placeholder="Имя пользователя">
+    <input id="auth-password" type="password" placeholder="Пароль">
+    <button id="auth-btn">Войти</button>
+    <div id="toggle-auth" class="toggle-link">Нет аккаунта? Зарегистрироваться</div>
+</div>
+
+<!-- ЧАТ -->
+<div id="chat-window" class="box">
+    <div id="user-info">
+        <span>Вы: <b id="current-user"></b></span>
+        <button id="logout-btn">Выйти</button>
+    </div>
     <ul id="messages"></ul>
     <div id="form-box">
-        <input id="name" placeholder="Имя" autocomplete="off">
         <input id="msg" placeholder="Сообщение..." autocomplete="off">
         <button id="send-btn">Отправить</button>
     </div>
 </div>
 
-<!-- Берем скрипт напрямую с работающего Node.js сервера -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
     var socket = io();
-    
-    var btn = document.getElementById('send-btn');
-    var messages = document.getElementById('messages');
+    var isLoginMode = true;
 
-    btn.addEventListener('click', function() {
-        var nameInput = document.getElementById('name').value;
-        var msgInput = document.getElementById('msg').value;
-        
-        if (nameInput.trim() !== '' && msgInput.trim() !== '') {
-            socket.emit('chat message', { user: nameInput, text: msgInput });
-            document.getElementById('msg').value = '';
+    // Сразу при загрузке проверяем, авторизован ли юзер
+    var savedUser = localStorage.getItem('username');
+    if (savedUser) {
+        showChat(savedUser);
+    }
+
+    document.getElementById('toggle-auth').addEventListener('click', function() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('auth-title').innerText = isLoginMode ? 'Вход в мессенджер' : 'Регистрация аккаунта';
+        document.getElementById('auth-btn').innerText = isLoginMode ? 'Войти' : 'Создать аккаунт';
+        document.getElementById('toggle-auth').innerText = isLoginMode ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти';
+    });
+
+    document.getElementById('auth-btn').addEventListener('click', async function() {
+        var username = document.getElementById('auth-username').value.trim();
+        var password = document.getElementById('auth-password').value;
+        if (!username || !password) return alert('Заполните все поля!');
+
+        var url = isLoginMode ? '/api/login' : '/api/register';
+        try {
+            var res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            var data = await res.json();
+            if (data.error) return alert(data.error);
+
+            if (isLoginMode) {
+                localStorage.setItem('username', data.username);
+                showChat(data.username);
+            } else {
+                alert('Успешно! Теперь войдите.');
+                isLoginMode = true;
+                document.getElementById('toggle-auth').click();
+            }
+        } catch (err) { alert('Ошибка связи с сервером'); }
+    });
+
+    function showChat(username) {
+        document.getElementById('auth-window').style.display = 'none';
+        document.getElementById('chat-window').style.display = 'flex';
+        document.getElementById('current-user').innerText = username;
+    }
+
+    document.getElementById('logout-btn').addEventListener('click', function() {
+        localStorage.clear();
+        location.reload();
+    });
+
+    // Чат логика
+    var messages = document.getElementById('messages');
+    function appendMessage(data) {
+        var li = document.createElement('li');
+        li.className = (data.user === localStorage.getItem('username')) ? 'me' : 'other';
+        li.innerHTML = '<span class="msg-author">' + data.user + '</span>' + data.text;
+        messages.appendChild(li);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    socket.on('chat history', function(history) {
+        messages.innerHTML = '';
+        history.forEach(appendMessage);
+    });
+    socket.on('chat message', appendMessage);
+
+    document.getElementById('send-btn').addEventListener('click', function() {
+        var msgInput = document.getElementById('msg');
+        var username = localStorage.getItem('username');
+        if (msgInput.value.trim() && username) {
+            socket.emit('chat message', { user: username, text: msgInput.value });
+            msgInput.value = '';
         }
     });
 
-    socket.on('chat message', function(data) {
-        var li = document.createElement('li');
-        li.innerHTML = '<b>' + data.user + ':</b> ' + data.text;
-        messages.appendChild(li);
-        messages.scrollTop = messages.scrollHeight;
+    document.getElementById('msg').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') document.getElementById('send-btn').click();
     });
 </script>
 </body>
 </html>
+
